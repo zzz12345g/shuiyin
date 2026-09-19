@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>水印工坊(可二传 不可盈利)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #14141f;
+    --panel: #1e1e2e;
+    --panel2: #262638;
+    --border: #33334a;
+    --text: #e8e8f0;
+    --text-dim: #9a9ab0;
+    --accent: #6c8cff;
+    --accent2: #9d6cff;
+    --danger: #ff6c8c;
+    --ok: #6cffb0;
+  }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    overflow: hidden;
+  }
+  .app {
+    display: grid;
+    grid-template-rows: 56px 1fr;
+    height: 100vh;
+  }
+  .topbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+  }
+  .logo {
+    font-weight: 700; font-size: 15px; white-space: nowrap;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .topbar .spacer { flex: 1; }
+  .btn {
+    padding: 8px 13px; border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel2); color: var(--text);
+    cursor: pointer; font-size: 13px; transition: all .15s; white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; color: #fff; font-weight: 600;
+  }
+  .btn.primary:hover { opacity: .9; color: #fff; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    overflow: hidden;
+  }
+  .stage {
+    position: relative;
+    background: repeating-conic-gradient(#1a1a26 0% 25%, #161622 0% 50%) 0 / 24px 24px;
+    overflow: auto;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .canvas-wrap {
+    max-width: 100%; max-height: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+  #canvas {
+    display: block;
+    max-width: 100%;
+    max-height: calc(100vh - 120px);
+    background: #fff;
+  }
+  .empty-tip { text-align: center; color: var(--text-dim); line-height: 1.8; }
+  .empty-tip .big { font-size: 48px; margin-bottom: 8px; }
+  .empty-tip button { margin-top: 12px; }
+
+  .panel {
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .panel-tabs { display: flex; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .panel-tab {
+    flex: 1; padding: 12px 4px; text-align: center;
+    cursor: pointer; color: var(--text-dim); font-size: 13px;
+    border-bottom: 2px solid transparent; transition: all .15s; white-space: nowrap;
+  }
+  .panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--panel2); }
+  .panel-body { flex: 1; overflow-y: auto; padding: 14px; }
+  .panel-body::-webkit-scrollbar { width: 6px; }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .section { margin-bottom: 18px; }
+  .section-title {
+    font-size: 12px; color: var(--text-dim);
+    letter-spacing: 1px; margin-bottom: 10px;
+    padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  }
+  .section-title .tag {
+    float: right; font-size: 10px; color: var(--accent); font-weight: normal;
+  }
+
+  .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .preset-item {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px; cursor: pointer;
+    transition: all .15s; text-align: center;
+  }
+  .preset-item:hover { border-color: var(--accent); }
+  .preset-item.active { border-color: var(--accent); background: rgba(108,140,255,.12); }
+  .preset-thumb {
+    height: 42px; border-radius: 4px; margin-bottom: 5px;
+    background: #fff; overflow: hidden; position: relative;
+  }
+  .preset-thumb canvas { width: 100%; height: 100%; display: block; }
+  .preset-name { font-size: 11px; color: var(--text); }
+  .preset-cat { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+
+  .ctrl { margin-bottom: 12px; }
+  .ctrl label {
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: var(--text-dim); margin-bottom: 4px;
+  }
+  .ctrl label .val { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .ctrl input[type=range] {
+    width: 100%; -webkit-appearance: none;
+    height: 4px; background: var(--border); border-radius: 2px; outline: none;
+  }
+  .ctrl input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--accent); cursor: pointer;
+  }
+  .ctrl input[type=text], .ctrl select {
+    width: 100%; padding: 7px 10px;
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 13px; outline: none;
+  }
+  .ctrl input:focus, .ctrl select:focus { border-color: var(--accent); }
+
+  .color-row { display: flex; align-items: center; gap: 8px; }
+  .color-row input[type=color] {
+    width: 40px; height: 28px; border: 1px solid var(--border);
+    border-radius: 4px; background: none; cursor: pointer; padding: 0;
+  }
+  .color-row .hex {
+    flex: 1; padding: 5px 8px; background: var(--panel2);
+    border: 1px solid var(--border); border-radius: 4px;
+    font-size: 12px; font-family: monospace; color: var(--text);
+  }
+
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+  .toggle-row .lbl { font-size: 13px; }
+  .switch {
+    width: 38px; height: 22px; background: var(--border);
+    border-radius: 11px; position: relative; cursor: pointer; transition: background .2s;
+    flex-shrink: 0;
+  }
+  .switch.on { background: var(--accent); }
+  .switch::after {
+    content: ''; position: absolute; width: 18px; height: 18px;
+    background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: left .2s;
+  }
+  .switch.on::after { left: 18px; }
+
+  .hidden-input { display: none; }
+  .hint { font-size: 11px; color: var(--text-dim); line-height: 1.6; padding: 8px; background: var(--panel2); border-radius: 6px; margin-top: 6px; }
+
+  @media (max-width: 860px) {
+    .main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+    .panel { border-left: none; border-top: 1px solid var(--border); max-height: 55vh; }
+    .stage { padding: 10px; }
+    #canvas { max-height: calc(100vh - 220px); }
+    body { font-size: 16px; }
+    .ctrl input, .ctrl select { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="logo">原创圈 · 水印工坊 Pro</div>
+    <div class="spacer"></div>
+    <button class="btn" id="btnImportBase">导入底图</button>
+    <button class="btn" id="btnImportImage">导入水印图</button>
+    <button class="btn primary" id="btnDownload" disabled>下载成品</button>
+  </div>
+
+  <div class="main">
+    <div class="stage" id="stage">
+      <div class="empty-tip" id="emptyTip">
+        <div class="big">⛰</div>
+        <div>点击右上角「导入底图」选择要打水印的图片</div>
+        <div style="font-size:12px;margin-top:4px;">所有处理均在本地完成 · 不经过服务器</div>
+      </div>
+      <div class="canvas-wrap" id="canvasWrap" style="display:none;">
+        <canvas id="canvas"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-tabs">
+        <div class="panel-tab active" data-tab="preset">预设库</div>
+        <div class="panel-tab" data-tab="text">文字</div>
+        <div class="panel-tab" data-tab="moire">摩尔纹</div>
+        <div class="panel-tab" data-tab="noise">颗粒</div>
+        <div class="panel-tab" data-tab="img">图片</div>
+      </div>
+      <div class="panel-body">
+
+        <!-- 预设库 -->
+        <div class="tab-pane" data-pane="preset">
+          <div class="section">
+            <div class="section-title">快速预设 <span class="tag">点击即用</span></div>
+            <div class="preset-grid" id="presetGrid"></div>
+          </div>
+        </div>
+
+        <!-- 文字 -->
+        <div class="tab-pane" data-pane="text" style="display:none;">
+          <div class="section">
+            <div class="section-title">文字内容</div>
+            <div class="ctrl">
+              <label>水印文字</label>
+              <input type="text" id="txtContent" value="© 原创作者 All Rights Reserved">
+            </div>
+            <div class="ctrl">
+              <label>字号 <span class="val" id="vFontSize">18</span></label>
+              <input type="range" id="rFontSize" min="8" max="80" value="18">
+            </div>
+            <div class="ctrl">
+              <label>字体</label>
+              <select id="selFont">
+                <option value="sans-serif">无衬线（黑体）</option>
+                <option value="serif">衬线（宋体）</option>
+                <option value="monospace">等宽</option>
+                <option value="'KaiTi', serif">楷体</option>
+                <option value="'STSong', serif">宋体细</option>
+              </select>
+            </div>
+            <div class="ctrl">
+              <label>字重</label>
+              <select id="selWeight">
+                <option value="normal">常规</option>
+                <option value="bold" selected>加粗</option>
+                <option value="lighter">细体</option>
+              </select>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title">颜色与透明度</div>
+            <div class="ctrl">
+              <label>颜色</label>
+              <div class="color-row">
+                <input type="color" id="txtColor" value="#ffffff">
+                <input type="text" class="hex" id="txtColorHex" value="#ffffff">
+              </div>
+            </div>
+            <div class="ctrl">
+              <label>不透明度 <span class="val" id="vTextOpacity">18%</span></label>
+              <input type="range" id="rTextOpacity" min="2" max="100" value="18">
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title">排列</div>
+            <div class="ctrl">
+              <label>倾斜角度 <span class="val" id="vTextAngle">-30°</span></label>
+              <input type="range" id="rTextAngle" min="-90" max="90" value="-30">
+            </div>
+            <div class="ctrl">
+              <label>水平间距 <span class="val" id="vTextGapX">220</span></label>
+              <input type="range" id="rTextGapX" min="80" max="600" value="220">
+            </div>
+            <div class="ctrl">
+              <label>垂直间距 <span class="val" id="vTextGapY">130</span></label>
+              <input type="range" id="rTextGapY" min="60" max="500" value="130">
+            </div>
+          </div>
+        </div>
+
+        <!-- 摩尔纹 -->
+        <div class="tab-pane" data-pane="moire" style="display:none;">
+          <div class="section">
+            <div class="section-title">纹理类型</div>
+            <div class="ctrl">
+              <select id="selMoire">
+                <option value="diamond">菱形网格</option>
+                <option value="honeycomb">蜂窝六边</option>
+                <option value="wave">波浪纹</option>
+                <option value="dot">点阵纹</option>
+                <option value="grid">方格纹</option>
+                <option value="stripe">斜条纹</option>
+                <option value="circle">同心圆</option>
+                <option value="fabric">织物交叉</option>
+                <option value="triangle">三角网</option>
+                <option value="zigzag">锯齿纹</option>
+                <option value="spiral">螺旋纹</option>
+                <option value="cross">十字星</option>
+                <option value="water">水波涟漪</option>
+                <option value="star">星形闪纹</option>
+              </select>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title">参数</div>
+            <div class="ctrl">
+              <label>密度（格子大小） <span class="val" id="vMoireDensity">60</span></label>
+              <input type="range" id="rMoireDensity" min="15" max="200" value="60">
+            </div>
+            <div class="ctrl">
+              <label>旋转角度 <span class="val" id="vMoireAngle">45°</span></label>
+              <input type="range" id="rMoireAngle" min="0" max="180" value="45">
+            </div>
+            <div class="ctrl">
+              <label>线条粗细 <span class="val" id="vMoireWidth">1</span></label>
+              <input type="range" id="rMoireWidth" min="1" max="8" value="1">
+            </div>
+            <div class="ctrl">
+              <label>不透明度 <span class="val" id="vMoireOpacity">12%</span></label>
+              <input type="range" id="rMoireOpacity" min="2" max="60" value="12">
+            </div>
+            <div class="ctrl">
+              <label>颜色</label>
+              <div class="color-row">
+                <input type="color" id="moireColor" value="#ffffff">
+                <input type="text" class="hex" id="moireColorHex" value="#ffffff">
+              </div>
+            </div>
+            <div class="toggle-row">
+              <span class="lbl">叠加混合模式</span>
+              <select id="selMoireBlend" style="width:auto;padding:4px 8px;font-size:12px;">
+                <option value="source-over">正常</option>
+                <option value="overlay" selected>叠加</option>
+                <option value="soft-light">柔光</option>
+                <option value="hard-light">强光</option>
+                <option value="multiply">正片叠底</option>
+                <option value="screen">滤色</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- 颗粒 -->
+        <div class="tab-pane" data-pane="noise" style="display:none;">
+          <div class="section">
+            <div class="section-title">颗粒类型</div>
+            <div class="ctrl">
+              <select id="selNoise">
+                <option value="grain">胶片颗粒</option>
+                <option value="halftone">半调网点</option>
+                <option value="frost">磨砂玻璃</option>
+                <option value="pixel">像素噪点</option>
+                <option value="cloud">云雾噪点</option>
+                <option value="highfreq">高频微噪</option>
+                <option value="rgbnoise">RGB 彩色扰动</option>
+              </select>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title">参数</div>
+            <div class="ctrl">
+              <label>强度 <span class="val" id="vNoiseIntensity">15%</span></label>
+              <input type="range" id="rNoiseIntensity" min="1" max="80" value="15">
+            </div>
+            <div class="ctrl">
+              <label>颗粒大小 <span class="val" id="vNoiseSize">2</span></label>
+              <input type="range" id="rNoiseSize" min="1" max="8" value="2">
+            </div>
+            <div class="ctrl">
+              <label>对比度 <span class="val" id="vNoiseContrast">50%</span></label>
+              <input type="range" id="rNoiseContrast" min="10" max="100" value="50">
+            </div>
+            <div class="hint">高频微噪 + RGB 彩色扰动是 AI 去水印最难处理的类型，因为它破坏了像素的统计一致性，同时肉眼几乎不可见。</div>
+          </div>
+        </div>
+
+        <!-- 图片水印 -->
+        <div class="tab-pane" data-pane="img" style="display:none;">
+          <div class="section">
+            <div class="section-title">水印图片</div>
+            <div class="ctrl">
+              <div id="imgStatus" style="padding:10px;background:var(--panel2);border:1px dashed var(--border);border-radius:8px;text-align:center;color:var(--text-dim);font-size:12px;">未导入水印图</div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">图片专用预设 <span class="tag">需先导入水印图</span></div>
+            <div class="preset-grid" id="imgPresetGrid"></div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">模糊处理（抗 AI 去除）</div>
+            <div class="ctrl">
+              <label>水印图模糊半径 <span class="val" id="vImgBlur">0px</span></label>
+              <input type="range" id="rImgBlur" min="0" max="20" value="0">
+            </div>
+            <div class="hint">把 logo/文字模糊成半透明纹理后平铺，AI 去水印模型很难区分模糊纹理和原图本身的内容，比锐利 logo 更难去除。</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">位置模式</div>
+            <div class="toggle-row">
+              <span class="lbl">平铺模式</span>
+              <div class="switch on" id="swTiled"></div>
+            </div>
+            <div class="toggle-row" id="offsetRow">
+              <span class="lbl">错位平铺（抗 AI）</span>
+              <div class="switch on" id="swOffset"></div>
+            </div>
+            <div class="ctrl" id="posRow" style="display:none;">
+              <label>水平位置 <span class="val" id="vPosX">50%</span></label>
+              <input type="range" id="rPosX" min="0" max="100" value="50">
+            </div>
+            <div class="ctrl" id="posRowY" style="display:none;">
+              <label>垂直位置 <span class="val" id="vPosY">50%</span></label>
+              <input type="range" id="rPosY" min="0" max="100" value="50">
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">外观</div>
+            <div class="ctrl">
+              <label>尺寸比例 <span class="val" id="vImgScale">20%</span></label>
+              <input type="range" id="rImgScale" min="5" max="80" value="20">
+            </div>
+            <div class="ctrl">
+              <label>旋转角度 <span class="val" id="vImgAngle">-20°</span></label>
+              <input type="range" id="rImgAngle" min="-180" max="180" value="-20">
+            </div>
+            <div class="ctrl">
+              <label>不透明度 <span class="val" id="vImgOpacity">40%</span></label>
+              <input type="range" id="rImgOpacity" min="5" max="100" value="40">
+            </div>
+            <div class="ctrl" id="imgGapXRow">
+              <label>平铺水平间距 <span class="val" id="vImgGapX">180</span></label>
+              <input type="range" id="rImgGapX" min="60" max="600" value="180">
+            </div>
+            <div class="ctrl" id="imgGapYRow">
+              <label>平铺垂直间距 <span class="val" id="vImgGapY">180</span></label>
+              <input type="range" id="rImgGapY" min="60" max="600" value="180">
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">混合模式（越靠后越难去除）</div>
+            <div class="ctrl">
+              <select id="selBlend">
+                <option value="source-over">正常</option>
+                <option value="multiply">正片叠底</option>
+                <option value="screen">滤色</option>
+                <option value="overlay">叠加</option>
+                <option value="soft-light" selected>柔光</option>
+                <option value="hard-light">强光</option>
+                <option value="color-dodge">颜色减淡</option>
+                <option value="color-burn">颜色加深</option>
+                <option value="difference">差值</option>
+                <option value="exclusion">排除</option>
+                <option value="luminosity">明度</option>
+                <option value="hue">色相</option>
+                <option value="saturation">饱和度</option>
+                <option value="color">颜色</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileBase" class="hidden-input" accept="image/*">
+<input type="file" id="fileImage" class="hidden-input" accept="image/*">
+
+<script>
+/* ============================================================
+   状态
+============================================================ */
+const state = {
+  baseImg: null,
+  watermarkImg: null,
+  txtContent: '© 原创作者 All Rights Reserved',
+  fontSize: 18, fontFamily: 'sans-serif', fontWeight: 'bold',
+  txtColor: '#ffffff', txtOpacity: 0.18,
+  txtAngle: -30, txtGapX: 220, txtGapY: 130,
+  moireType: 'diamond', moireDensity: 60, moireAngle: 45,
+  moireWidth: 1, moireOpacity: 0.12, moireColor: '#ffffff',
+  moireBlend: 'overlay',
+  noiseType: 'grain', noiseIntensity: 0.15, noiseSize: 2, noiseContrast: 0.5,
+  imgTiled: true, imgScale: 0.20, imgAngle: -20, imgOpacity: 0.40,
+  imgGapX: 180, imgGapY: 180, imgPosX: 0.5, imgPosY: 0.5,
+  imgBlur: 0, blendMode: 'soft-light',
+  imgOffset: true,
+  layerText: true, layerMoire: false, layerNoise: false, layerImg: false,
+};
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let renderPending = false;
+function scheduleRender() {
+  if (renderPending) return;
+  renderPending = true;
+  requestAnimationFrame(() => {
+    renderPending = false;
+    render();
+  });
+}
+
+let _textPatternKey = '';
+let _textPattern = null;
+let _noiseTileKey = '';
+let _noiseTile = null;
+let _moireTileKey = '';
+let _moireTile = null;
+
+/* ============================================================
+   预设
+============================================================ */
+const PRESETS = [
+  { name:'经典斜纹防盗', cat:'文字', thumb:'text',
+    apply(){ setLayers(true,false,false,false); Object.assign(state,{
+      txtContent:'© 原创作者 All Rights Reserved', fontSize:18, txtColor:'#fff', txtOpacity:.18, txtAngle:-30, txtGapX:220, txtGapY:130 }); } },
+  { name:'密集小字防盗', cat:'文字', thumb:'text',
+    apply(){ setLayers(true,false,false,false); Object.assign(state,{
+      txtContent:'禁盗必究', fontSize:14, txtColor:'#fff', txtOpacity:.22, txtAngle:-45, txtGapX:120, txtGapY:80 }); } },
+  { name:'大字署名', cat:'文字', thumb:'text',
+    apply(){ setLayers(true,false,false,false); Object.assign(state,{
+      txtContent:'原创', fontSize:60, txtColor:'#fff', txtOpacity:.10, txtAngle:-20, txtGapX:500, txtGapY:350 }); } },
+  { name:'对角签名', cat:'文字', thumb:'text',
+    apply(){ setLayers(true,false,false,false); Object.assign(state,{
+      txtContent:'@作者', fontSize:22, txtColor:'#fff', txtOpacity:.25, txtAngle:-30, txtGapX:400, txtGapY:300 }); } },
+  { name:'横平竖直水印', cat:'文字', thumb:'text',
+    apply(){ setLayers(true,false,false,false); Object.assign(state,{
+      txtContent:'© 原创', fontSize:16, txtColor:'#fff', txtOpacity:.20, txtAngle:0, txtGapX:260, txtGapY:160 }); } },
+  { name:'菱形摩尔纹', cat:'摩尔纹', thumb:'moire-diamond',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'diamond', moireDensity:60, moireAngle:45, moireWidth:1, moireOpacity:.12, moireColor:'#fff', moireBlend:'overlay' }); } },
+  { name:'蜂窝隐纹', cat:'摩尔纹', thumb:'moire-honeycomb',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'honeycomb', moireDensity:70, moireAngle:0, moireWidth:1, moireOpacity:.10, moireColor:'#fff', moireBlend:'overlay' }); } },
+  { name:'波浪柔纹', cat:'摩尔纹', thumb:'moire-wave',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'wave', moireDensity:80, moireAngle:0, moireWidth:1, moireOpacity:.10, moireColor:'#fff', moireBlend:'overlay' }); } },
+  { name:'点阵微纹', cat:'摩尔纹', thumb:'moire-dot',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'dot', moireDensity:40, moireAngle:0, moireWidth:1, moireOpacity:.15, moireColor:'#fff', moireBlend:'overlay' }); } },
+  { name:'方格暗纹', cat:'摩尔纹', thumb:'moire-grid',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'grid', moireDensity:80, moireAngle:0, moireWidth:1, moireOpacity:.08, moireColor:'#fff', moireBlend:'soft-light' }); } },
+  { name:'斜条纹防护', cat:'摩尔纹', thumb:'moire-stripe',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'stripe', moireDensity:30, moireAngle:45, moireWidth:2, moireOpacity:.12, moireColor:'#fff', moireBlend:'overlay' }); } },
+  { name:'同心圆纹', cat:'摩尔纹', thumb:'moire-circle',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'circle', moireDensity:90, moireAngle:0, moireWidth:1, moireOpacity:.10, moireColor:'#fff', moireBlend:'overlay' }); } },
+  { name:'织物布纹', cat:'摩尔纹', thumb:'moire-fabric',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'fabric', moireDensity:20, moireAngle:0, moireWidth:1, moireOpacity:.10, moireColor:'#fff', moireBlend:'overlay' }); } },
+  { name:'三角网纹', cat:'摩尔纹', thumb:'moire-triangle',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'triangle', moireDensity:50, moireAngle:0, moireWidth:1, moireOpacity:.10, moireColor:'#fff', moireBlend:'overlay' }); } },
+  { name:'锯齿纹', cat:'摩尔纹', thumb:'moire-zigzag',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'zigzag', moireDensity:60, moireAngle:0, moireWidth:1, moireOpacity:.10, moireColor:'#fff', moireBlend:'overlay' }); } },
+  { name:'螺旋纹', cat:'摩尔纹', thumb:'moire-spiral',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'spiral', moireDensity:100, moireAngle:0, moireWidth:1, moireOpacity:.10, moireColor:'#fff', moireBlend:'overlay' }); } },
+  { name:'十字星纹', cat:'摩尔纹', thumb:'moire-cross',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'cross', moireDensity:50, moireAngle:0, moireWidth:1, moireOpacity:.10, moireColor:'#fff', moireBlend:'overlay' }); } },
+  { name:'水波涟漪', cat:'摩尔纹', thumb:'moire-water',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'water', moireDensity:90, moireAngle:0, moireWidth:1, moireOpacity:.10, moireColor:'#fff', moireBlend:'overlay' }); } },
+  { name:'星形闪纹', cat:'摩尔纹', thumb:'moire-star',
+    apply(){ setLayers(false,true,false,false); Object.assign(state,{
+      moireType:'star', moireDensity:60, moireAngle:0, moireWidth:1, moireOpacity:.10, moireColor:'#fff', moireBlend:'overlay' }); } },
+  { name:'胶片颗粒', cat:'颗粒', thumb:'noise-grain',
+    apply(){ setLayers(false,false,true,false); Object.assign(state,{
+      noiseType:'grain', noiseIntensity:.15, noiseSize:2, noiseContrast:.5 }); } },
+  { name:'半调网点', cat:'颗粒', thumb:'noise-halftone',
+    apply(){ setLayers(false,false,true,false); Object.assign(state,{
+      noiseType:'halftone', noiseIntensity:.30, noiseSize:3, noiseContrast:.7 }); } },
+  { name:'磨砂玻璃', cat:'颗粒', thumb:'noise-frost',
+    apply(){ setLayers(false,false,true,false); Object.assign(state,{
+      noiseType:'frost', noiseIntensity:.25, noiseSize:4, noiseContrast:.4 }); } },
+  { name:'像素噪点', cat:'颗粒', thumb:'noise-pixel',
+    apply(){ setLayers(false,false,true,false); Object.assign(state,{
+      noiseType:'pixel', noiseIntensity:.12, noiseSize:1, noiseContrast:.6 }); } },
+  { name:'云雾噪点', cat:'颗粒', thumb:'noise-cloud',
+    apply(){ setLayers(false,false,true,false); Object.assign(state,{
+      noiseType:'cloud', noiseIntensity:.20, noiseSize:3, noiseContrast:.5 }); } },
+  { name:'高频微噪', cat:'颗粒·抗AI', thumb:'noise-highfreq',
+    apply(){ setLayers(false,false,true,false); Object.assign(state,{
+      noiseType:'highfreq', noiseIntensity:.25, noiseSize:1, noiseContrast:.8 }); } },
+  { name:'RGB彩色扰动', cat:'颗粒·抗AI', thumb:'noise-rgb',
+    apply(){ setLayers(false,false,true,false); Object.assign(state,{
+      noiseType:'rgbnoise', noiseIntensity:.18, noiseSize:1, noiseContrast:.7 }); } },
+  { name:'综合防盗', cat:'组合', thumb:'combo',
+    apply(){ setLayers(true,true,false,false); Object.assign(state,{
+      txtContent:'© 原创 禁盗', fontSize:16, txtColor:'#fff', txtOpacity:.15, txtAngle:-30, txtGapX:250, txtGapY:160,
+      moireType:'dot', moireDensity:50, moireAngle:0, moireWidth:1, moireOpacity:.08, moireBlend:'overlay' }); } },
+  { name:'隐形感防护', cat:'组合·抗AI', thumb:'combo',
+    apply(){ setLayers(true,true,true,false); Object.assign(state,{
+      txtContent:'原创', fontSize:20, txtColor:'#fff', txtOpacity:.08, txtAngle:-30, txtGapX:300, txtGapY:200,
+      moireType:'fabric', moireDensity:18, moireAngle:0, moireWidth:1, moireOpacity:.06, moireBlend:'overlay',
+      noiseType:'grain', noiseIntensity:.08, noiseSize:2, noiseContrast:.4 }); } },
+  { name:'高频双频防护', cat:'组合·抗AI', thumb:'combo',
+    apply(){ setLayers(false,true,true,false); Object.assign(state,{
+      moireType:'dot', moireDensity:30, moireAngle:45, moireWidth:1, moireOpacity:.10, moireColor:'#fff', moireBlend:'overlay',
+      noiseType:'highfreq', noiseIntensity:.22, noiseSize:1, noiseContrast:.8 }); } },
+  { name:'彩色扰动防护', cat:'组合·抗AI', thumb:'combo',
+    apply(){ setLayers(true,true,true,false); Object.assign(state,{
+      txtContent:'原创', fontSize:18, txtColor:'#fff', txtOpacity:.06, txtAngle:-30, txtGapX:280, txtGapY:180,
+      moireType:'fabric', moireDensity:16, moireAngle:0, moireWidth:1, moireOpacity:.05, moireBlend:'overlay',
+      noiseType:'rgbnoise', noiseIntensity:.15, noiseSize:1, noiseContrast:.6 }); } },
+  { name:'磨砂半调', cat:'组合·抗AI', thumb:'combo',
+    apply(){ setLayers(false,true,true,false); Object.assign(state,{
+      moireType:'halftone', moireDensity:40, moireAngle:0, moireWidth:2, moireOpacity:.15, moireColor:'#000', moireBlend:'soft-light',
+      noiseType:'frost', noiseIntensity:.15, noiseSize:3, noiseContrast:.4 }); } },
+  { name:'叠底防护', cat:'组合·抗AI', thumb:'combo',
+    apply(){ setLayers(true,true,false,false); Object.assign(state,{
+      txtContent:'禁盗', fontSize:14, txtColor:'#000', txtOpacity:.12, txtAngle:-45, txtGapX:150, txtGapY:100,
+      moireType:'fabric', moireDensity:18, moireAngle:0, moireWidth:1, moireOpacity:.08, moireColor:'#000', moireBlend:'multiply' }); } },
+  { name:'柔光织物', cat:'组合', thumb:'combo',
+    apply(){ setLayers(true,true,false,false); Object.assign(state,{
+      txtContent:'© 你的名字', fontSize:18, txtColor:'#fff', txtOpacity:.12, txtAngle:-25, txtGapX:260, txtGapY:170,
+      moireType:'fabric', moireDensity:20, moireAngle:0, moireWidth:1, moireOpacity:.08, moireColor:'#fff', moireBlend:'soft-light' }); } },
+  { name:'品牌署名位', cat:'组合', thumb:'combo',
+    apply(){ setLayers(true,false,false,true); Object.assign(state,{
+      txtContent:'@你的名字', fontSize:22, txtColor:'#fff', txtOpacity:.30, txtAngle:0, txtGapX:400, txtGapY:300,
+      imgTiled:false, imgScale:.15, imgOpacity:.5, imgPosX:.85, imgPosY:.92, imgBlur:0 }); } },
+];
+
+const IMG_PRESETS = [
+  { name:'模糊平铺纹理', desc:'logo 模糊成纹理平铺',
+    apply(){ Object.assign(state,{ imgTiled:true, imgBlur:8, imgScale:.18, imgAngle:-20, imgOpacity:.35, imgGapX:150, imgGapY:150, blendMode:'soft-light' }); } },
+  { name:'模糊密铺', desc:'小尺寸强模糊密铺',
+    apply(){ Object.assign(state,{ imgTiled:true, imgBlur:12, imgScale:.12, imgAngle:-30, imgOpacity:.30, imgGapX:100, imgGapY:100, blendMode:'overlay' }); } },
+  { name:'锐利平铺', desc:'清晰 logo 平铺',
+    apply(){ Object.assign(state,{ imgTiled:true, imgBlur:0, imgScale:.20, imgAngle:-20, imgOpacity:.40, imgGapX:180, imgGapY:180, blendMode:'source-over' }); } },
+  { name:'半透明署名', desc:'右下角单图署名',
+    apply(){ Object.assign(state,{ imgTiled:false, imgBlur:0, imgScale:.15, imgAngle:0, imgOpacity:.60, imgPosX:.85, imgPosY:.92, blendMode:'source-over' }); } },
+  { name:'对角 logo', desc:'斜置对角 logo',
+    apply(){ Object.assign(state,{ imgTiled:true, imgBlur:0, imgScale:.25, imgAngle:-45, imgOpacity:.35, imgGapX:300, imgGapY:250, blendMode:'source-over' }); } },
+  { name:'柔光叠加', desc:'柔光模式纹理叠加',
+    apply(){ Object.assign(state,{ imgTiled:true, imgBlur:6, imgScale:.20, imgAngle:-20, imgOpacity:.50, imgGapX:160, imgGapY:160, blendMode:'soft-light' }); } },
+  { name:'正片叠底', desc:'multiply 融合',
+    apply(){ Object.assign(state,{ imgTiled:true, imgBlur:4, imgScale:.18, imgAngle:-20, imgOpacity:.45, imgGapX:160, imgGapY:160, blendMode:'multiply' }); } },
+  { name:'颜色叠加', desc:'color 混合模式',
+    apply(){ Object.assign(state,{ imgTiled:true, imgBlur:8, imgScale:.22, imgAngle:-20, imgOpacity:.40, imgGapX:170, imgGapY:170, blendMode:'color' }); } },
+];
+
+function setLayers(t, m, n, i) {
+  state.layerText = t; state.layerMoire = m; state.layerNoise = n; state.layerImg = i;
+}
+
+/* ============================================================
+   摩尔纹绘制
+============================================================ */
+function drawMoire(g, type, size, color, alpha, lineWidth, W, H) {
+  g.save();
+  g.strokeStyle = color;
+  g.fillStyle = color;
+  g.globalAlpha = alpha;
+  g.lineWidth = lineWidth;
+  const s = size;
+  if (!W) W = g.canvas.width;
+  if (!H) H = g.canvas.height;
+
+  switch(type) {
+    case 'diamond':
+      for (let x=-s; x<W+s; x+=s)
+        for (let y=-s; y<H+s; y+=s) {
+          g.beginPath();
+          g.moveTo(x,y-s/2); g.lineTo(x+s/2,y); g.lineTo(x,y+s/2); g.lineTo(x-s/2,y);
+          g.closePath(); g.stroke();
+        }
+      break;
+    case 'honeycomb': {
+      const r=s/2, w_=Math.sqrt(3)*r; let row=0;
+      for (let y=-r; y<H+r*2; y+=r*1.5, row++)
+        for (let x=-w_; x<W+w_; x+=w_*2) {
+          const ox=(row%2)*w_;
+          g.beginPath();
+          for (let i=0;i<6;i++){ const a=Math.PI/3*i+Math.PI/6;
+            const px=x+ox+r*Math.cos(a), py=y+r*Math.sin(a);
+            i===0?g.moveTo(px,py):g.lineTo(px,py); }
+          g.closePath(); g.stroke();
+        }
+      break;
+    }
+    case 'wave':
+      for (let y=0; y<H+s; y+=s/2) {
+        g.beginPath();
+        for (let x=0; x<=W; x+=2) {
+          const yy = y + Math.sin(x/s*Math.PI*2)*s/6;
+          x===0?g.moveTo(x,yy):g.lineTo(x,yy);
+        }
+        g.stroke();
+      }
+      break;
+    case 'dot':
+      for (let y=0; y<H; y+=s)
+        for (let x=0; x<W; x+=s) {
+          g.beginPath(); g.arc(x,y,lineWidth+0.5,0,Math.PI*2); g.fill();
+        }
+      break;
+    case 'grid':
+      for (let x=0; x<=W; x+=s){ g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke(); }
+      for (let y=0; y<=H; y+=s){ g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke(); }
+      break;
+    case 'stripe':
+      g.lineWidth = lineWidth*2;
+      for (let i=-H; i<W+H; i+=s) {
+        g.beginPath(); g.moveTo(i,0); g.lineTo(i+H,H); g.stroke();
+      }
+      break;
+    case 'circle':
+      for (let x=s; x<W+s; x+=s*2)
+        for (let y=s; y<H+s; y+=s*2)
+          for (let r=s/4; r<s; r+=s/4) { g.beginPath(); g.arc(x,y,r,0,Math.PI*2); g.stroke(); }
+      break;
+    case 'fabric':
+      for (let x=0; x<=W; x+=s){ g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke(); }
+      for (let y=0; y<=H; y+=s){ g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke(); }
+      g.globalAlpha = alpha*0.5;
+      for (let x=-s; x<=W; x+=s){ g.beginPath(); g.moveTo(x,0); g.lineTo(x+s,H); g.stroke(); }
+      break;
+    case 'triangle': {
+      const h_=s*Math.sqrt(3)/2; let row=0;
+      for (let y=-h_; y<H+h_; y+=h_, row++)
+        for (let x=0; x<W+s; x+=s*1.5) {
+          const ox=(row%2)*s*0.75;
+          g.beginPath();
+          g.moveTo(x+ox,y); g.lineTo(x+ox+s/2,y+h_); g.lineTo(x+ox-s/2,y+h_);
+          g.closePath(); g.stroke();
+        }
+      break;
+    }
+    case 'zigzag':
+      for (let y=0; y<H+s; y+=s/2) {
+        g.beginPath();
+        for (let x=0; x<=W; x+=4) {
+          const yy = y + ((Math.floor(x/4)%2===0) ? -s/6 : s/6);
+          x===0?g.moveTo(x,yy):g.lineTo(x,yy);
+        }
+        g.stroke();
+      }
+      break;
+    case 'spiral':
+      for (let x=s; x<W+s; x+=s*2)
+        for (let y=s; y<H+s; y+=s*2) {
+          g.beginPath();
+          for (let a=0; a<Math.PI*5; a+=0.2) {
+            const r=a*s/10, px=x+Math.cos(a)*r, py=y+Math.sin(a)*r;
+            a===0?g.moveTo(px,py):g.lineTo(px,py);
+          }
+          g.stroke();
+        }
+      break;
+    case 'cross':
+      for (let x=s/2; x<W+s; x+=s)
+        for (let y=s/2; y<H+s; y+=s) {
+          g.beginPath();
+          g.moveTo(x-s/3,y); g.lineTo(x+s/3,y);
+          g.moveTo(x,y-s/3); g.lineTo(x,y+s/3);
+          g.stroke();
+        }
+      break;
+    case 'water':
+      for (let x=s; x<W+s; x+=s*2)
+        for (let y=s; y<H+s; y+=s*2) {
+          g.beginPath(); g.arc(x,y,s*0.3,0,Math.PI*2); g.stroke();
+          g.globalAlpha=alpha*0.5;
+          g.beginPath(); g.arc(x,y,s*0.55,0,Math.PI*2); g.stroke();
+          g.globalAlpha=alpha;
+        }
+      break;
+    case 'star':
+      for (let x=s; x<W+s; x+=s*2)
+        for (let y=s; y<H+s; y+=s*2) {
+          g.beginPath();
+          for (let i=0;i<10;i++){
+            const r = i%2===0 ? s*0.4 : s*0.15;
+            const a = Math.PI/5*i - Math.PI/2;
+            const px=x+r*Math.cos(a), py=y+r*Math.sin(a);
+            i===0?g.moveTo(px,py):g.lineTo(px,py);
+          }
+          g.closePath(); g.stroke();
+        }
+      break;
+  }
+  g.restore();
+}
+
+/* ============================================================
+   主渲染
+============================================================ */
+function render() {
+  if (!state.baseImg) return;
+  const w = state.baseImg.width, h = state.baseImg.height;
+  canvas.width = w; canvas.height = h;
+  ctx.drawImage(state.baseImg, 0, 0, w, h);
+
+  if (state.layerText) {
+    const key = `text|${state.txtContent}|${state.fontSize}|${state.fontFamily}|${state.fontWeight}|${state.txtColor}|${state.txtOpacity}|${state.txtAngle}|${state.txtGapX}|${state.txtGapY}`;
+    if (key !== _textPatternKey) {
+      const c = document.createElement('canvas');
+      c.width = state.txtGapX; c.height = state.txtGapY;
+      const g = c.getContext('2d');
+      g.translate(c.width/2, c.height/2);
+      g.rotate(state.txtAngle * Math.PI/180);
+      g.globalAlpha = state.txtOpacity;
+      g.fillStyle = state.txtColor;
+      g.font = `${state.fontWeight} ${state.fontSize}px ${state.fontFamily}`;
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(state.txtContent, 0, 0);
+      _textPattern = ctx.createPattern(c, 'repeat');
+      _textPatternKey = key;
+    }
+    ctx.save();
+    ctx.fillStyle = _textPattern;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+
+  if (state.layerMoire) {
+    const key = `m|${state.moireType}|${state.moireDensity}|${state.moireAngle}|${state.moireWidth}|${state.moireOpacity}|${state.moireColor}|${state.moireBlend}`;
+    if (key !== _moireTileKey) {
+      const tile = Math.max(state.moireDensity*3, 80);
+      const big = tile * 2;
+      const c = document.createElement('canvas');
+      c.width = tile; c.height = tile;
+      const g = c.getContext('2d');
+      g.save();
+      g.translate(tile/2, tile/2);
+      g.rotate(state.moireAngle * Math.PI/180);
+      g.translate(-big/2, -big/2);
+      drawMoire(g, state.moireType, state.moireDensity, state.moireColor, 1, state.moireWidth, big, big);
+      g.restore();
+      _moireTile = ctx.createPattern(c, 'repeat');
+      _moireTileKey = key;
+    }
+    ctx.save();
+    ctx.globalAlpha = state.moireOpacity;
+    ctx.globalCompositeOperation = state.moireBlend;
+    ctx.fillStyle = _moireTile;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+
+  if (state.layerNoise) {
+    const key = `n|${state.noiseType}|${state.noiseIntensity}|${state.noiseSize}|${state.noiseContrast}`;
+    if (key !== _noiseTileKey) {
+      _noiseTile = buildNoiseTile();
+      _noiseTileKey = key;
+    }
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, state.noiseIntensity * 3);
+    ctx.fillStyle = ctx.createPattern(_noiseTile, 'repeat');
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+
+  if (state.layerImg && state.watermarkImg) {
+    applyImageWatermark(w, h);
+  }
+}
+
+function buildNoiseTile() {
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = S; c.height = S;
+  const g = c.getContext('2d');
+  const size = Math.max(1, state.noiseSize);
+  const contrast = state.noiseContrast;
+
+  switch(state.noiseType) {
+    case 'halftone':
+      g.fillStyle = '#fff';
+      for (let y=0; y<S; y+=size*2)
+        for (let x=0; x<S; x+=size*2) {
+          const r = Math.random()*size*contrast;
+          g.beginPath(); g.arc(x+size, y+size, r/2, 0, Math.PI*2); g.fill();
+        }
+      break;
+    case 'frost':
+      for (let i=0; i<(S*S)/(size*size); i++) {
+        const x = Math.floor(Math.random()*S/size)*size;
+        const y = Math.floor(Math.random()*S/size)*size;
+        const v = Math.random()>0.5 ? 255 : 0;
+        g.fillStyle = `rgba(${v},${v},${v},${0.1+Math.random()*0.2*contrast})`;
+        g.fillRect(x, y, size, size);
+      }
+      break;
+    case 'pixel':
+      for (let i=0; i<(S*S)/(size*size); i++) {
+        const x = Math.floor(Math.random()*S/size)*size;
+        const y = Math.floor(Math.random()*S/size)*size;
+        const v = Math.random()>0.5 ? 255 : 0;
+        g.fillStyle = `rgba(${v},${v},${v},${0.4*contrast})`;
+        g.fillRect(x, y, size, size);
+      }
+      break;
+    case 'cloud':
+      for (let i=0; i<30; i++) {
+        const x = Math.random()*S, y = Math.random()*S;
+        const r = 20 + Math.random()*60*contrast;
+        const v = Math.random()>0.5 ? 255 : 0;
+        const grad = g.createRadialGradient(x,y,0,x,y,r);
+        grad.addColorStop(0, `rgba(${v},${v},${v},0.3)`);
+        grad.addColorStop(1, `rgba(${v},${v},${v},0)`);
+        g.fillStyle = grad;
+        g.beginPath(); g.arc(x,y,r,0,Math.PI*2); g.fill();
+      }
+      break;
+    case 'highfreq': {
+      const imgData = g.createImageData(S, S);
+      const d = imgData.data;
+      for (let i=0; i<d.length; i+=4) {
+        const v = Math.random() > 0.5 ? 255 : 0;
+        d[i]=v; d[i+1]=v; d[i+2]=v; d[i+3]=255;
+      }
+      g.putImageData(imgData, 0, 0);
+      break;
+    }
+    case 'rgbnoise': {
+      const imgData = g.createImageData(S, S);
+      const d = imgData.data;
+      for (let i=0; i<d.length; i+=4) {
+        d[i]   = Math.random()*255;
+        d[i+1] = Math.random()*255;
+        d[i+2] = Math.random()*255;
+        d[i+3] = 255;
+      }
+      g.putImageData(imgData, 0, 0);
+      break;
+    }
+    default: {
+      const imgData = g.createImageData(S, S);
+      const d = imgData.data;
+      for (let i=0; i<d.length; i+=4) {
+        const v = Math.random() > 0.5 ? 255 : 0;
+        d[i]=v; d[i+1]=v; d[i+2]=v; d[i+3]=255;
+      }
+      g.putImageData(imgData, 0, 0);
+    }
+  }
+  return c;
+}
+
+let _imgPatternKey = '';
+let _imgPattern = null;
+
+function applyImageWatermark(w, h) {
+  const img = state.watermarkImg;
+  const ratio = img.width / img.height;
+  let dw, dh;
+  if (ratio >= 1) { dw = w * state.imgScale; dh = dw / ratio; }
+  else { dh = h * state.imgScale; dw = dh * ratio; }
+
+  if (state.imgTiled) {
+    const key = `img|${state.imgGapX}|${state.imgGapY}|${dw}|${dh}|${state.imgAngle}|${state.imgBlur}|${state.imgOffset}|${state.watermarkImg.src.length}`;
+    if (key !== _imgPatternKey) {
+      const stepX = state.imgGapX, stepY = state.imgGapY;
+      const tileH = state.imgOffset ? stepY * 2 : stepY;
+      const c = document.createElement('canvas');
+      c.width = stepX; c.height = tileH;
+      const g = c.getContext('2d');
+      if (state.imgBlur > 0) g.filter = `blur(${state.imgBlur}px)`;
+      const rad = state.imgAngle * Math.PI/180;
+      g.save();
+      g.translate(stepX/2, stepY/2);
+      g.rotate(rad);
+      g.drawImage(img, -dw/2, -dh/2, dw, dh);
+      g.restore();
+      if (state.imgOffset) {
+        g.save();
+        g.translate(0, stepY + stepY/2);
+        g.rotate(rad);
+        g.drawImage(img, -dw/2, -dh/2, dw, dh);
+        g.restore();
+      }
+      _imgPattern = ctx.createPattern(c, 'repeat');
+      _imgPatternKey = key;
+    }
+    ctx.save();
+    ctx.globalAlpha = state.imgOpacity;
+    ctx.globalCompositeOperation = state.blendMode;
+    ctx.fillStyle = _imgPattern;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  } else {
+    ctx.save();
+    ctx.globalAlpha = state.imgOpacity;
+    ctx.globalCompositeOperation = state.blendMode;
+    if (state.imgBlur > 0) ctx.filter = `blur(${state.imgBlur}px)`;
+    const px = w * state.imgPosX, py = h * state.imgPosY;
+    ctx.translate(px, py);
+    ctx.rotate(state.imgAngle * Math.PI/180);
+    ctx.drawImage(img, -dw/2, -dh/2, dw, dh);
+    ctx.restore();
+  }
+}
+
+/* ============================================================
+   文件导入
+============================================================ */
+document.getElementById('btnImportBase').onclick = () => document.getElementById('fileBase').click();
+document.getElementById('btnImportImage').onclick = () => document.getElementById('fileImage').click();
+
+document.getElementById('fileBase').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    state.baseImg = img;
+    document.getElementById('emptyTip').style.display = 'none';
+    document.getElementById('canvasWrap').style.display = 'block';
+    document.getElementById('btnDownload').disabled = false;
+    _textPatternKey = _noiseTileKey = _moireTileKey = '';
+    render();
+  };
+  img.src = URL.createObjectURL(f);
+};
+
+document.getElementById('fileImage').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    state.watermarkImg = img;
+    state.layerImg = true;
+    const st = document.getElementById('imgStatus');
+    st.textContent = `已导入：${f.name}（${img.width}×${img.height}）`;
+    st.style.color = 'var(--ok)';
+    scheduleRender();
+  };
+  img.src = URL.createObjectURL(f);
+};
+
+document.getElementById('btnDownload').onclick = () => {
+  canvas.toBlob((blob) => {
+    if (!blob) { alert('导出失败，请截图保存'); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '水印成品-' + Date.now() + '.png';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => { showSaveBox(url); }, 300);
+  }, 'image/png');
+};
+
+function showSaveBox(url) {
+  let box = document.getElementById('saveBox');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'saveBox';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;';
+  box.innerHTML =
+    '<div style="color:#fff;font-size:15px;text-align:center;line-height:1.6;">' +
+    '<div style="font-size:17px;font-weight:600;margin-bottom:8px;">成品已生成</div>' +
+    '<div style="color:#aaa;font-size:13px;">手机没自动下载的话<br>请<b style="color:#6cffb0;">长按下方图片 → 保存到相册</b></div>' +
+    '</div>' +
+    '<img src="' + url + '" style="max-width:90%;max-height:60vh;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);">' +
+    '<button onclick="this.parentElement.remove()" style="padding:10px 30px;background:#6c8cff;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">关闭</button>';
+  document.body.appendChild(box);
+}
+
+/* ============================================================
+   Tab 切换
+============================================================ */
+document.querySelectorAll('.panel-tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const name = tab.dataset.tab;
+    document.querySelectorAll('.tab-pane').forEach(p => {
+      p.style.display = p.dataset.pane === name ? 'block' : 'none';
+    });
+    if (name === 'text') { state.layerText = true; }
+    if (name === 'moire') { state.layerMoire = true; state.moireOpacity = Math.max(state.moireOpacity, 0.2); }
+    if (name === 'noise') { state.layerNoise = true; }
+    if (name === 'img' && state.watermarkImg) { state.layerImg = true; }
+    scheduleRender();
+  };
+});
+
+/* ============================================================
+   控件绑定
+============================================================ */
+function bindRange(id, valId, key, fmt, transform) {
+  const el = document.getElementById(id), val = document.getElementById(valId);
+  el.oninput = () => {
+    let v = parseFloat(el.value);
+    if (transform) v = transform(v);
+    state[key] = v;
+    if (val) val.textContent = fmt(v);
+    scheduleRender();
+  };
+}
+
+document.getElementById('txtContent').oninput = (e) => { state.txtContent = e.target.value; scheduleRender(); };
+bindRange('rFontSize','vFontSize','fontSize', v=>v);
+document.getElementById('selFont').onchange = (e) => { state.fontFamily = e.target.value; scheduleRender(); };
+document.getElementById('selWeight').onchange = (e) => { state.fontWeight = e.target.value; scheduleRender(); };
+document.getElementById('txtColor').oninput = (e) => { state.txtColor = e.target.value; document.getElementById('txtColorHex').value = e.target.value; scheduleRender(); };
+document.getElementById('txtColorHex').oninput = (e) => { if(/^#[0-9a-fA-F]{6}$/.test(e.target.value)){ state.txtColor = e.target.value; document.getElementById('txtColor').value=e.target.value; scheduleRender(); } };
+bindRange('rTextOpacity','vTextOpacity','txtOpacity', v=>Math.round(v*100)+'%', v=>v/100);
+bindRange('rTextAngle','vTextAngle','txtAngle', v=>v+'°');
+bindRange('rTextGapX','vTextGapX','txtGapX', v=>v);
+bindRange('rTextGapY','vTextGapY','txtGapY', v=>v);
+
+document.getElementById('selMoire').onchange = (e) => { state.moireType = e.target.value; state.layerMoire = true; scheduleRender(); };
+bindRange('rMoireDensity','vMoireDensity','moireDensity', v=>v);
+bindRange('rMoireAngle','vMoireAngle','moireAngle', v=>v+'°');
+bindRange('rMoireWidth','vMoireWidth','moireWidth', v=>v);
+bindRange('rMoireOpacity','vMoireOpacity','moireOpacity', v=>Math.round(v*100)+'%', v=>v/100);
+document.getElementById('moireColor').oninput = (e) => { state.moireColor = e.target.value; document.getElementById('moireColorHex').value = e.target.value; state.layerMoire = true; scheduleRender(); };
+document.getElementById('moireColorHex').oninput = (e) => { if(/^#[0-9a-fA-F]{6}$/.test(e.target.value)){ state.moireColor = e.target.value; document.getElementById('moireColor').value=e.target.value; state.layerMoire = true; scheduleRender(); } };
+document.getElementById('selMoireBlend').onchange = (e) => { state.moireBlend = e.target.value; state.layerMoire = true; scheduleRender(); };
+
+document.getElementById('selNoise').onchange = (e) => { state.noiseType = e.target.value; state.layerNoise = true; scheduleRender(); };
+bindRange('rNoiseIntensity','vNoiseIntensity','noiseIntensity', v=>Math.round(v*100)+'%', v=>v/100);
+bindRange('rNoiseSize','vNoiseSize','noiseSize', v=>v);
+bindRange('rNoiseContrast','vNoiseContrast','noiseContrast', v=>Math.round(v*100)+'%', v=>v/100);
+
+document.getElementById('swTiled').onclick = function(){
+  this.classList.toggle('on');
+  state.imgTiled = this.classList.contains('on');
+  document.getElementById('posRow').style.display = state.imgTiled ? 'none' : 'block';
+  document.getElementById('posRowY').style.display = state.imgTiled ? 'none' : 'block';
+  document.getElementById('imgGapXRow').style.display = state.imgTiled ? 'block' : 'none';
+  document.getElementById('imgGapYRow').style.display = state.imgTiled ? 'block' : 'none';
+  document.getElementById('offsetRow').style.display = state.imgTiled ? 'flex' : 'none';
+  scheduleRender();
+};
+document.getElementById('swOffset').onclick = function(){
+  this.classList.toggle('on');
+  state.imgOffset = this.classList.contains('on');
+  scheduleRender();
+};
+bindRange('rImgScale','vImgScale','imgScale', v=>Math.round(v*100)+'%', v=>v/100);
+bindRange('rImgAngle','vImgAngle','imgAngle', v=>v+'°');
+bindRange('rImgOpacity','vImgOpacity','imgOpacity', v=>Math.round(v*100)+'%', v=>v/100);
+bindRange('rImgBlur','vImgBlur','imgBlur', v=>v+'px');
+bindRange('rImgGapX','vImgGapX','imgGapX', v=>v);
+bindRange('rImgGapY','vImgGapY','imgGapY', v=>v);
+bindRange('rPosX','vPosX','imgPosX', v=>Math.round(v)+'%', v=>v/100);
+bindRange('rPosY','vPosY','imgPosY', v=>Math.round(v)+'%', v=>v/100);
+document.getElementById('selBlend').onchange = (e) => { state.blendMode = e.target.value; scheduleRender(); };
+
+/* ============================================================
+   预设缩略图 & 构建
+============================================================ */
+function renderPresetThumb(el, kind) {
+  const c = document.createElement('canvas');
+  c.width = 100; c.height = 44;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0,0,100,44);
+  grad.addColorStop(0,'#e8d5b7'); grad.addColorStop(1,'#b7c8e8');
+  g.fillStyle = grad; g.fillRect(0,0,100,44);
+
+  if (kind === 'text') {
+    g.save(); g.translate(50,22); g.rotate(-Math.PI/6);
+    g.fillStyle = '#fff'; g.font = 'bold 9px sans-serif'; g.textAlign='center';
+    g.fillText('原创 ©', 0, 3); g.restore();
+  } else if (kind.startsWith('moire-')) {
+    const t = kind.replace('moire-','');
+    drawMoire(g, t, 10, '#fff', 0.7, 1);
+  } else if (kind.startsWith('noise-')) {
+    g.globalAlpha = 0.6;
+    for (let k=0;k<200;k++) {
+      g.fillStyle = Math.random()>0.5 ? '#000' : '#fff';
+      g.fillRect(Math.random()*100, Math.random()*44, 1, 1);
+    }
+  } else if (kind === 'combo') {
+    g.save(); g.translate(50,22); g.rotate(-Math.PI/6);
+    g.fillStyle='#fff'; g.font='bold 8px sans-serif'; g.textAlign='center';
+    g.fillText('©原创',0,3); g.restore();
+    for (let k=0;k<80;k++) {
+      g.fillStyle='rgba(255,255,255,.5)';
+      g.fillRect(Math.random()*100, Math.random()*44, 1, 1);
+    }
+  }
+  el.appendChild(c);
+}
+
+function buildPresets() {
+  const grid = document.getElementById('presetGrid');
+  PRESETS.forEach((p) => {
+    const item = document.createElement('div');
+    item.className = 'preset-item';
+    const thumb = document.createElement('div');
+    thumb.className = 'preset-thumb';
+    item.appendChild(thumb);
+    const name = document.createElement('div');
+    name.className = 'preset-name'; name.textContent = p.name;
+    item.appendChild(name);
+    const cat = document.createElement('div');
+    cat.className = 'preset-cat'; cat.textContent = p.cat;
+    item.appendChild(cat);
+    item.onclick = () => {
+      document.querySelectorAll('.preset-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      p.apply();
+      syncUI();
+      scheduleRender();
+    };
+    grid.appendChild(item);
+    renderPresetThumb(thumb, p.thumb);
+  });
+
+  const ig = document.getElementById('imgPresetGrid');
+  IMG_PRESETS.forEach((p) => {
+    const item = document.createElement('div');
+    item.className = 'preset-item';
+    item.style.padding = '8px';
+    const name = document.createElement('div');
+    name.className = 'preset-name'; name.textContent = p.name;
+    item.appendChild(name);
+    const desc = document.createElement('div');
+    desc.className = 'preset-cat'; desc.textContent = p.desc;
+    desc.style.fontSize = '10px';
+    item.appendChild(desc);
+    item.onclick = () => {
+      if (!state.watermarkImg) { alert('请先导入水印图片'); return; }
+      p.apply();
+      syncUI();
+      scheduleRender();
+    };
+    ig.appendChild(item);
+  });
+}
+
+function syncUI() {
+  document.getElementById('txtContent').value = state.txtContent;
+  document.getElementById('rFontSize').value = state.fontSize;
+  document.getElementById('vFontSize').textContent = state.fontSize;
+  document.getElementById('selFont').value = state.fontFamily;
+  document.getElementById('selWeight').value = state.fontWeight;
+  document.getElementById('txtColor').value = state.txtColor;
+  document.getElementById('txtColorHex').value = state.txtColor;
+  document.getElementById('rTextOpacity').value = state.txtOpacity*100;
+  document.getElementById('vTextOpacity').textContent = Math.round(state.txtOpacity*100)+'%';
+  document.getElementById('rTextAngle').value = state.txtAngle;
+  document.getElementById('vTextAngle').textContent = state.txtAngle+'°';
+  document.getElementById('rTextGapX').value = state.txtGapX;
+  document.getElementById('vTextGapX').textContent = state.txtGapX;
+  document.getElementById('rTextGapY').value = state.txtGapY;
+  document.getElementById('vTextGapY').textContent = state.txtGapY;
+
+  document.getElementById('selMoire').value = state.moireType;
+  document.getElementById('rMoireDensity').value = state.moireDensity;
+  document.getElementById('vMoireDensity').textContent = state.moireDensity;
+  document.getElementById('rMoireAngle').value = state.moireAngle;
+  document.getElementById('vMoireAngle').textContent = state.moireAngle+'°';
+  document.getElementById('rMoireWidth').value = state.moireWidth;
+  document.getElementById('vMoireWidth').textContent = state.moireWidth;
+  document.getElementById('rMoireOpacity').value = state.moireOpacity*100;
+  document.getElementById('vMoireOpacity').textContent = Math.round(state.moireOpacity*100)+'%';
+  document.getElementById('moireColor').value = state.moireColor;
+  document.getElementById('moireColorHex').value = state.moireColor;
+  document.getElementById('selMoireBlend').value = state.moireBlend;
+
+  document.getElementById('selNoise').value = state.noiseType;
+  document.getElementById('rNoiseIntensity').value = state.noiseIntensity*100;
+  document.getElementById('vNoiseIntensity').textContent = Math.round(state.noiseIntensity*100)+'%';
+  document.getElementById('rNoiseSize').value = state.noiseSize;
+  document.getElementById('vNoiseSize').textContent = state.noiseSize;
+  document.getElementById('rNoiseContrast').value = state.noiseContrast*100;
+  document.getElementById('vNoiseContrast').textContent = Math.round(state.noiseContrast*100)+'%';
+
+  document.getElementById('swTiled').classList.toggle('on', state.imgTiled);
+  document.getElementById('swOffset').classList.toggle('on', state.imgOffset);
+  document.getElementById('rImgScale').value = state.imgScale*100;
+  document.getElementById('vImgScale').textContent = Math.round(state.imgScale*100)+'%';
+  document.getElementById('rImgAngle').value = state.imgAngle;
+  document.getElementById('vImgAngle').textContent = state.imgAngle+'°';
+  document.getElementById('rImgOpacity').value = state.imgOpacity*100;
+  document.getElementById('vImgOpacity').textContent = Math.round(state.imgOpacity*100)+'%';
+  document.getElementById('rImgBlur').value = state.imgBlur;
+  document.getElementById('vImgBlur').textContent = state.imgBlur+'px';
+  document.getElementById('rImgGapX').value = state.imgGapX;
+  document.getElementById('vImgGapX').textContent = state.imgGapX;
+  document.getElementById('rImgGapY').value = state.imgGapY;
+  document.getElementById('vImgGapY').textContent = state.imgGapY;
+  document.getElementById('rPosX').value = state.imgPosX*100;
+  document.getElementById('vPosX').textContent = Math.round(state.imgPosX*100)+'%';
+  document.getElementById('rPosY').value = state.imgPosY*100;
+  document.getElementById('vPosY').textContent = Math.round(state.imgPosY*100)+'%';
+  document.getElementById('selBlend').value = state.blendMode;
+  document.getElementById('posRow').style.display = state.imgTiled ? 'none' : 'block';
+  document.getElementById('posRowY').style.display = state.imgTiled ? 'none' : 'block';
+  document.getElementById('imgGapXRow').style.display = state.imgTiled ? 'block' : 'none';
+  document.getElementById('imgGapYRow').style.display = state.imgTiled ? 'block' : 'none';
+}
+
+buildPresets();
+</script>
+</body>
+</html>
